@@ -1,0 +1,407 @@
+body.dark-theme {
+  --background-dark: #000000;
+  --background-light: #000000;
+  --surface: #212121;
+  --primary: #3a7bfd;
+  --primary-hover: #5a91fe;
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+  --border-color: #272727;
+  --playing-text: #ffffff;
+  --danger: #e53935;
+  --logo-bg: rgba(255, 255, 255, 0.1);
+}
+
+body.light-theme {
+  --background-dark: #ffffff;
+  --background-light: #eaf6ff;
+  --surface: #dcf0ff;
+  --primary: #007bff;
+  --primary-hover: #0069d9;
+  --text-primary: #000000;
+  --text-secondary: #343a40;
+  --border-color: #cdeaff;
+  --playing-text: #ffffff;
+  --danger: #d32f2f;
+  --logo-bg: #0d47a1; /* Deep Blue */
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background-dark);
+  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.App {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.App-header {
+  padding: 1rem 1.5rem;
+  background-color: var(--background-light);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  z-index: 10;
+  position: relative;
+}
+
+.title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.App-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.header-status-message {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-secondary);
+  text-align: left;
+  width: 50%;
+}
+
+.header-status-message p {
+    margin: 0;
+}
+
+.header-buttons {
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.theme-toggle-button {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-primary);
+}
+
+.theme-toggle-button:hover {
+  background-color: var(--surface);
+}
+
+.theme-toggle-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.error {
+  color: #ff4d4f;
+  margin-top: 1rem;
+}
+
+.App-main {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.playlist-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background-color: var(--background-light);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+}
+
+.playlist-sidebar h2 {
+  margin: 0;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 1.2rem;
+}
+
+.playlist-sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.playlist-sidebar li {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s ease;
+  font-weight: 500;
+}
+
+.playlist-sidebar li:hover {
+  background-color: var(--surface);
+}
+
+.playlist-sidebar li.playing {
+  background-color: var(--primary);
+  font-weight: 700;
+  color: var(--playing-text);
+}
+
+.playlist-sidebar li.playing span {
+    color: var(--playing-text);
+}
+
+.channel-logo-container {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  margin-right: 1rem;
+  background-color: var(--logo-bg);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.channel-logo-container img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
+.playlist-sidebar li span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+
+.player-section {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #000;
+}
+
+.player-section video {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.player-placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 2rem;
+}
+
+.player-placeholder p {
+    font-size: 1.2rem;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: var(--background-light);
+  padding: 1.5rem;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.modal-body-columns {
+    display: flex;
+    gap: 1.5rem;
+    flex-grow: 1;
+    overflow: hidden; /* Important for child scrolling */
+}
+
+.settings-menu {
+    flex-basis: 150px; /* Width of the left menu */
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-color);
+}
+
+.settings-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.settings-menu li {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-right: -1px; /* Overlap the border */
+}
+
+.settings-menu li.active {
+    background-color: var(--surface);
+    font-weight: bold;
+    border-right: 2px solid var(--primary);
+}
+
+.settings-menu li.disabled {
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.settings-content {
+    flex-grow: 1;
+    overflow-y: auto; /* Enable scrolling for the content area */
+}
+
+.settings-content h3 {
+    margin-top: 0;
+}
+
+.add-playlist-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+}
+
+.add-playlist-form input {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--surface);
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.add-playlist-form button {
+    align-self: flex-end;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    background-color: var(--primary);
+    color: white;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.playlist-manage-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+}
+
+.playlist-manage-list li {
+    background-color: var(--surface);
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.playlist-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.playlist-url {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+    margin-top: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.playlist-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.playlist-actions button {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.playlist-actions button:hover {
+    background-color: var(--background-light);
+}
+
+.playlist-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.playlist-actions .delete-button {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.playlist-actions .delete-button:hover {
+    background-color: var(--danger);
+    color: white;
+}
