@@ -5,11 +5,24 @@ import { Parser as XmlParser } from 'xml2js';
 import cors from '@fastify/cors';
 import { gunzip } from 'zlib';
 import { promisify } from 'util';
+import path from 'path';
+import fastifyStatic from '@fastify/static';
 
 const gunzipAsync = promisify(gunzip);
 
 const app = Fastify({
   logger: true
+});
+
+// Serve frontend files
+app.register(fastifyStatic, {
+  root: path.join(__dirname, '..', '..', 'frontend', 'dist'),
+});
+
+// SPA fallback: for any route that is not an API route or a static file, 
+// serve index.html and let the frontend router handle it.
+app.setNotFoundHandler((req, reply) => {
+  reply.sendFile('index.html');
 });
 
 app.register(cors, {
