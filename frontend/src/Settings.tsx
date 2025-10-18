@@ -1,30 +1,62 @@
 import React, { useState } from 'react';
-import type { PlaylistItem } from './App';
+import type { PlaylistItem, EpgSourceItem } from './App';
 
 interface SettingsProps {
   isOpen: boolean;
   onClose: () => void;
+  // Playlist props
   playlists: PlaylistItem[];
   addPlaylist: (name: string, url: string) => void;
   deletePlaylist: (id: string) => void;
   setDefaultPlaylist: (id: string) => void;
   loadPlaylist: (playlist: PlaylistItem) => void;
+  // EPG props
+  epgSources: EpgSourceItem[];
+  addEpgSource: (name: string, url: string) => void;
+  deleteEpgSource: (id: string) => void;
+  setDefaultEpgSource: (id: string) => void;
 }
 
-export function Settings({ isOpen, onClose, playlists, addPlaylist, deletePlaylist, setDefaultPlaylist, loadPlaylist }: SettingsProps) {
-  const [newName, setNewName] = useState('');
-  const [newUrl, setNewUrl] = useState('');
+export function Settings({ 
+    isOpen, 
+    onClose, 
+    playlists, 
+    addPlaylist, 
+    deletePlaylist, 
+    setDefaultPlaylist, 
+    loadPlaylist, 
+    epgSources,
+    addEpgSource,
+    deleteEpgSource,
+    setDefaultEpgSource
+}: SettingsProps) {
   const [activeTab, setActiveTab] = useState('playlists');
+
+  // State for playlist form
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [newPlaylistUrl, setNewPlaylistUrl] = useState('');
+
+  // State for EPG form
+  const [newEpgName, setNewEpgName] = useState('');
+  const [newEpgUrl, setNewEpgUrl] = useState('');
 
   if (!isOpen) {
     return null;
   }
 
-  const handleAdd = () => {
-    if (newName && newUrl) {
-      addPlaylist(newName, newUrl);
-      setNewName('');
-      setNewUrl('');
+  const handleAddPlaylist = () => {
+    if (newPlaylistName && newPlaylistUrl) {
+      addPlaylist(newPlaylistName, newPlaylistUrl);
+      setNewPlaylistName('');
+      setNewPlaylistUrl('');
+    }
+  };
+
+  const handleAddEpg = () => {
+    if (newEpgName && newEpgUrl) {
+      addEpgSource(newEpgName, newEpgUrl);
+      setNewEpgName('');
+      setNewEpgUrl('');
     }
   };
 
@@ -44,7 +76,7 @@ export function Settings({ isOpen, onClose, playlists, addPlaylist, deletePlayli
             <aside className="settings-menu">
                 <ul>
                     <li className={activeTab === 'playlists' ? 'active' : ''} onClick={() => setActiveTab('playlists')}>播放列表</li>
-                    <li className="disabled">EPG 节目单 (即将推出)</li>
+                    <li className={activeTab === 'epg' ? 'active' : ''} onClick={() => setActiveTab('epg')}>EPG 节目单</li>
                 </ul>
             </aside>
             <main className="settings-content">
@@ -55,16 +87,16 @@ export function Settings({ isOpen, onClose, playlists, addPlaylist, deletePlayli
                             <input
                             type="text"
                             placeholder="列表名称 (例如: 我的列表)"
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
+                            value={newPlaylistName}
+                            onChange={(e) => setNewPlaylistName(e.target.value)}
                             />
                             <input
                             type="text"
                             placeholder="列表 URL (.m3u 或 .txt)"
-                            value={newUrl}
-                            onChange={(e) => setNewUrl(e.target.value)}
+                            value={newPlaylistUrl}
+                            onChange={(e) => setNewPlaylistUrl(e.target.value)}
                             />
-                            <button onClick={handleAdd}>添加</button>
+                            <button onClick={handleAddPlaylist}>添加</button>
                         </div>
 
                         <h3>已保存的播放列表</h3>
@@ -77,6 +109,40 @@ export function Settings({ isOpen, onClose, playlists, addPlaylist, deletePlayli
                                 <button onClick={() => handleLoadAndClose(p)}>加载</button>
                                 <button onClick={() => setDefaultPlaylist(p.id)} disabled={p.isDefault}>设为默认</button>
                                 <button onClick={() => deletePlaylist(p.id)} className="delete-button">删除</button>
+                                </div>
+                            </li>
+                            ))}
+                        </ul>
+                    </>
+                )}
+                {activeTab === 'epg' && (
+                    <>
+                        <h3>添加新的 EPG 源</h3>
+                        <div className="add-playlist-form">
+                            <input
+                            type="text"
+                            placeholder="EPG 名称 (例如: 我的节目单)"
+                            value={newEpgName}
+                            onChange={(e) => setNewEpgName(e.target.value)}
+                            />
+                            <input
+                            type="text"
+                            placeholder="EPG URL (.xml)"
+                            value={newEpgUrl}
+                            onChange={(e) => setNewEpgUrl(e.target.value)}
+                            />
+                            <button onClick={handleAddEpg}>添加</button>
+                        </div>
+
+                        <h3>已保存的 EPG 源</h3>
+                        <ul className="playlist-manage-list">
+                            {epgSources.map((epg) => (
+                            <li key={epg.id}>
+                                <span className="playlist-name">{epg.name}{epg.isDefault && ' (默认)'}</span>
+                                <span className="playlist-url">{epg.url}</span>
+                                <div className="playlist-actions">
+                                <button onClick={() => setDefaultEpgSource(epg.id)} disabled={epg.isDefault}>设为默认</button>
+                                <button onClick={() => deleteEpgSource(epg.id)} className="delete-button">删除</button>
                                 </div>
                             </li>
                             ))}

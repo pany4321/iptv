@@ -1,31 +1,54 @@
 # Project Context
 
 ## Purpose
-[Describe your project's purpose and goals]
+This project is an IPTV web player. It allows users to manage IPTV playlists, browse channels, and watch live video streams in a web browser. The application consists of a React-based frontend and a Fastify-based backend.
 
 ## Tech Stack
-- [List your primary technologies]
-- [e.g., TypeScript, React, Node.js]
+- **Frontend:**
+  - TypeScript
+  - React
+  - Vite
+  - HLS.js for video streaming
+  - Axios for HTTP requests
+- **Backend:**
+  - TypeScript
+  - Node.js
+  - Fastify
+  - `iptv-playlist-parser` for parsing M3U playlists
+  - Axios for fetching external resources
+- **Testing:**
+  - `tap` and `nock` for backend testing
 
 ## Project Conventions
 
 ### Code Style
-[Describe your code style preferences, formatting rules, and naming conventions]
+- Code is formatted using standard TypeScript and React conventions.
+- ESLint is used for linting in the frontend.
+- Naming conventions should follow camelCase for variables and functions, and PascalCase for components and classes.
 
 ### Architecture Patterns
-[Document your architectural decisions and patterns]
+- **Client-Server Architecture:** The application is split into a frontend single-page application (SPA) and a backend API server.
+- **Backend API:** The backend provides a RESTful API for fetching and parsing playlists, and for proxying video streams to avoid CORS issues.
+- **React Components:** The frontend is built with React functional components and hooks.
 
 ### Testing Strategy
-[Explain your testing approach and requirements]
+- **Backend:** Unit and integration tests are written using `tap`. Mocks for external services are created using `nock`.
+- **Frontend:** (To be defined) Currently, no testing framework is set up for the frontend.
 
 ### Git Workflow
-[Describe your branching strategy and commit conventions]
+- (To be defined) A branching strategy and commit conventions need to be established.
 
 ## Domain Context
-[Add domain-specific knowledge that AI assistants need to understand]
+- **IPTV:** The core domain is Internet Protocol Television (IPTV).
+- **M3U Playlists:** The application works with M3U playlist files, which are plain text files that specify the locations of media streams.
+- **HLS:** The primary streaming protocol used is HTTP Live Streaming (HLS).
+- **CORS Proxy:** A backend proxy is necessary because many IPTV streams do not have the correct CORS headers, which would prevent them from being loaded directly in the browser.
 
 ## Important Constraints
-[List any technical, business, or regulatory constraints]
+- The application must be able to handle various M3U playlist formats.
+- The video player should be robust and handle different stream types gracefully.
+- The backend proxy needs to be efficient to not introduce significant latency.
 
 ## External Dependencies
-[Document key external services, APIs, or systems]
+- The application relies on users providing URLs to external IPTV playlists.
+- The application fetches video streams from various external servers.

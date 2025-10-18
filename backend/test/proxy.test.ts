@@ -29,7 +29,7 @@ tap.test('Stream proxy', async (t) => {
     const targetUrl = `${remoteStreamUrl}${streamPath}`;
     const response = await app.inject({
       method: 'GET',
-      url: `/stream?url=${encodeURIComponent(targetUrl)}`,
+      url: `/proxy?url=${encodeURIComponent(targetUrl)}`,
     });
 
     t.equal(response.statusCode, 200, 'should return a 200 status code');
@@ -48,7 +48,7 @@ tap.test('Stream proxy', async (t) => {
     const targetUrl = `${remoteStreamUrl}${streamPath}`;
     const response = await app.inject({
       method: 'GET',
-      url: `/stream?url=${encodeURIComponent(targetUrl)}`,
+      url: `/proxy?url=${encodeURIComponent(targetUrl)}`,
     });
 
     t.equal(response.statusCode, 502, 'should return a 502 status code');

@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import Hls from 'hls.js';
 import { Settings } from './Settings';
+import { GuidePanel } from './GuidePanel';
+import { PlaylistSwitcher } from './PlaylistSwitcher';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Data Structures ---
@@ -12,58 +14,76 @@ export interface PlaylistItem {
   isDefault: boolean;
 }
 
-interface Channel {
+export interface EpgSourceItem {
+    id: string;
+    name: string;
+    url: string;
+    isDefault: boolean;
+}
+
+export interface Channel {
   name: string;
   tvg: { id: string; name: string; logo: string; url: string; rec: string; };
   url: string;
   group: { title: string; };
 }
 
-// --- HLS.js Custom Loader ---
-class CustomFragmentLoader extends Hls.DefaultConfig.loader {
-  baseUrl: string;
-  constructor(config: any) {
-    super(config);
-    this.baseUrl = config.baseUrl;
-    this.load = this.load.bind(this);
-  }
-  load(context: any, config: any, callbacks: any) {
-    let url = context.url;
-    const isLocalhostUrl = url.includes('//localhost');
-    if (!/^(https?:)?\/\//.test(url) || isLocalhostUrl) {
-      if (isLocalhostUrl) {
-        try {
-          const urlObject = new URL(url);
-          url = urlObject.pathname.substring(1);
-        } catch (e) { /* Ignore */ }
-      }
-      url = this.baseUrl + url;
-    }
-    context.url = `http://localhost:3000/proxy?url=${encodeURIComponent(url)}`;
-    super.load(context, config, callbacks);
-  }
+export interface Programme {
+    channel: string;
+    title: string;
+    description: string;
+    start: string; // ISO 8601 date string
+    stop: string;  // ISO 8601 date string
 }
+
+import { CustomFragmentLoader } from './hlsLoader';
+
+const processEpgData = (programmes: Programme[]) => {
+    const epgByChannel: { [key: string]: Programme[] } = {};
+    for (const programme of programmes) {
+        if (!epgByChannel[programme.channel]) {
+            epgByChannel[programme.channel] = [];
+        }
+        epgByChannel[programme.channel].push(programme);
+    }
+    return epgByChannel;
+};
+
+const handleError = (error: any, message: string) => {
+    console.error(message, error);
+    if (message !== 'Failed to load EPG data in background') {
+      setError(error.response?.data?.details || message);
+    }
+  }
 
 function App() {
   const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
+  const [epgSources, setEpgSources] = useState<EpgSourceItem[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [processedEpgData, setProcessedEpgData] = useState<{ [key: string]: Programme[] }>({});
   const [currentPlaylistName, setCurrentPlaylistName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<string | null>(null);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(localStorage.getItem('sidebarCollapsed') === 'true');
+  const [guideChannel, setGuideChannel] = useState<Channel | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
 
   useEffect(() => {
     const savedPlaylists: PlaylistItem[] = JSON.parse(localStorage.getItem('playlists') || '[]');
     setPlaylists(savedPlaylists);
+
+    const savedEpgSources: EpgSourceItem[] = JSON.parse(localStorage.getItem('epgSources') || '[]');
+    setEpgSources(savedEpgSources);
+
     const defaultPlaylist = savedPlaylists.find(p => p.isDefault);
     if (defaultPlaylist) {
-      handleLoad(defaultPlaylist);
+      handleLoad(defaultPlaylist, savedEpgSources);
     } else if (savedPlaylists.length > 0) {
-      handleLoad(savedPlaylists[0]);
+      handleLoad(savedPlaylists[0], savedEpgSources);
     }
   }, []);
 
@@ -72,11 +92,45 @@ function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
   const toggleTheme = () => {
     setTheme(prevTheme => (prevTheme === 'dark' ? 'light' : 'dark'));
   };
 
-  const handleLoad = async (playlist: PlaylistItem) => {
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  };
+
+  const showGuide = (channel: Channel) => {
+    if (guideChannel && guideChannel.name === channel.name) {
+        setGuideChannel(null); // Toggle off if same channel
+    } else {
+        setGuideChannel(channel);
+    }
+  };
+
+  const closeGuide = () => {
+    setGuideChannel(null);
+  };
+
+  const loadEpgDataInBackground = async (currentEpgSources?: EpgSourceItem[]) => {
+    const sources = currentEpgSources || epgSources;
+    const defaultEpg = sources.find(epg => epg.isDefault);
+
+    if (defaultEpg) {
+        try {
+            const epgResponse = await axios.get(`http://localhost:3000/epg`, { params: { url: defaultEpg.url } });
+            setProcessedEpgData(processEpgData(epgResponse.data.programmes));
+        } catch (epgErr: any) {
+handleError(epgErr, 'Failed to load EPG data in background');
+        }
+    }
+  };
+
+  const handleLoad = async (playlist: PlaylistItem, currentEpgSources?: EpgSourceItem[]) => {
     if (!playlist || !playlist.url) {
       setError('无效的播放列表。');
       return;
@@ -84,18 +138,26 @@ function App() {
     setError(null);
     setLoading(true);
     setChannels([]);
+    setProcessedEpgData({});
     setNowPlaying(null);
     setCurrentPlaylistName(playlist.name);
+    closeGuide(); // Close guide when loading new playlist
 
+    console.log('Loading playlist:', playlist);
     try {
       const response = await axios.get(`http://localhost:3000/playlist`, { params: { url: playlist.url } });
+      console.log('Playlist data:', response.data);
       setChannels(response.data);
+      // EPG data is now loaded in the background, not blocking the UI
+      loadEpgDataInBackground(currentEpgSources);
     } catch (err: any) {
-      setError(err.response?.data?.details || '加载播放列表失败。');
+      console.error('Failed to load playlist:', err);
+      handleError(err, '加载播放列表失败。');
     }
     setLoading(false);
   };
 
+  // --- Playlist Management ---
   const savePlaylists = (newPlaylists: PlaylistItem[]) => {
     setPlaylists(newPlaylists);
     localStorage.setItem('playlists', JSON.stringify(newPlaylists));
@@ -115,6 +177,28 @@ function App() {
   const setDefaultPlaylist = (id: string) => {
     const updatedPlaylists = playlists.map(p => ({ ...p, isDefault: p.id === id }));
     savePlaylists(updatedPlaylists);
+  };
+
+  // --- EPG Management ---
+  const saveEpgSources = (newEpgs: EpgSourceItem[]) => {
+    setEpgSources(newEpgs);
+    localStorage.setItem('epgSources', JSON.stringify(newEpgs));
+  }
+
+  const addEpgSource = (name: string, url: string) => {
+    const newEpg: EpgSourceItem = { id: uuidv4(), name, url, isDefault: epgSources.length === 0 };
+    const updatedEpgs = [...epgSources, newEpg];
+    saveEpgSources(updatedEpgs);
+  };
+
+  const deleteEpgSource = (id: string) => {
+    const updatedEpgs = epgSources.filter(epg => epg.id !== id);
+    saveEpgSources(updatedEpgs);
+  };
+
+  const setDefaultEpgSource = (id: string) => {
+    const updatedEpgs = epgSources.map(epg => ({ ...epg, isDefault: epg.id === id }));
+    saveEpgSources(updatedEpgs);
   };
 
   const playChannel = (channel: Channel) => {
@@ -138,7 +222,9 @@ function App() {
           videoRef.current?.play().catch(() => console.error('视频播放被浏览器阻止。'));
         });
         hls.on(Hls.Events.ERROR, (event, data) => {
-          if (data.fatal) { console.error('HLS.js 致命错误:', data); }
+          if (data.fatal) {
+            handleError(data, 'HLS.js 致命错误');
+          }
         });
       } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
         videoRef.current.src = proxiedStreamUrl;
@@ -149,8 +235,50 @@ function App() {
     }
   };
 
+  const findCurrentProgram = (channel: Channel): Programme | null => {
+    const channelEpg = processedEpgData[channel.name];
+    if (!channelEpg) return null;
+
+    const now = new Date();
+    return channelEpg.find(prog => 
+        new Date(prog.start) <= now &&
+        new Date(prog.stop) > now
+    ) || null;
+  };
+
+  const renderChannelList = () => (
+    <aside className="channel-list-sidebar">
+        <div className="playlist-sidebar-header">
+            <PlaylistSwitcher playlists={playlists} currentPlaylistName={currentPlaylistName} onSelect={handleLoad} />
+            <button onClick={toggleSidebar} className="sidebar-toggle-button" title={isSidebarCollapsed ? '展开' : '收起'}>
+              {isSidebarCollapsed ? '»' : '«'}
+            </button>
+        </div>
+        {loading ? <p style={{padding: '1rem'}}>加载中...</p> : <ul>
+        {channels.map((channel, index) => {
+            const currentProgram = findCurrentProgram(channel);
+            const isGuideOpenForThisChannel = guideChannel?.name === channel.name;
+            return (
+            <li key={index} onClick={() => playChannel(channel)} className={nowPlaying === channel.name ? 'playing' : ''}>
+                <div className="channel-logo-container">
+                    <img src={channel.tvg.logo} alt={channel.name} />
+                </div>
+                <div className="channel-info">
+                    <span>{channel.name}</span>
+                    <small className="current-program"><span style={{display: 'inline-block'}}>{currentProgram?.title || ' ' }</span></small>
+                </div>
+                <button className="guide-button" title="节目单" onClick={(e) => { e.stopPropagation(); showGuide(channel); }}>
+                    {isGuideOpenForThisChannel ? '«' : '»'}
+                </button>
+            </li>
+            )
+        })}
+        </ul>}
+    </aside>
+  );
+
   return (
-    <div className="App">
+    <div className={`App ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <header className="App-header">
         <div className="title-bar">
           <h1>IPTV 播放器</h1>
@@ -174,19 +302,8 @@ function App() {
         </div>
       </header>
       <main className="App-main">
-        <aside className="playlist-sidebar">
-          <h2>{currentPlaylistName || '播放列表'}</h2>
-          {loading ? <p style={{padding: '1rem'}}>加载中...</p> : <ul>
-            {channels.map((channel, index) => (
-              <li key={index} onClick={() => playChannel(channel)} className={nowPlaying === channel.name ? 'playing' : ''}>
-                <div className="channel-logo-container">
-                  <img src={channel.tvg.logo} alt={channel.name} />
-                </div>
-                <span>{channel.name}</span>
-              </li>
-            ))}
-          </ul>}
-        </aside>
+        {renderChannelList()}
+        {guideChannel && <GuidePanel channel={guideChannel} epgData={processedEpgData[guideChannel.name]} onClose={closeGuide} />}
         <section className="player-section">
           <video ref={videoRef} controls width="100%" height="100%" />
           {!nowPlaying && (
@@ -203,7 +320,11 @@ function App() {
         addPlaylist={addPlaylist}
         deletePlaylist={deletePlaylist}
         setDefaultPlaylist={setDefaultPlaylist}
-        loadPlaylist={handleLoad}
+        loadPlaylist={(p) => handleLoad(p)}
+        epgSources={epgSources}
+        addEpgSource={addEpgSource}
+        deleteEpgSource={deleteEpgSource}
+        setDefaultEpgSource={setDefaultEpgSource}
       />
     </div>
   );
