@@ -316,10 +316,32 @@ handleError(epgErr, 'Failed to load EPG data in background');
         {channels.map((channel, index) => {
             const currentProgram = findCurrentProgram(channel);
             const isGuideOpenForThisChannel = guideChannel?.name === channel.name;
+
+            // --- Auto-fetch Logo Logic ---
+            let logoUrl = channel.tvg.logo;
+            if (!logoUrl) {
+                const epgForChannel = findEpgForChannel(channel, processedEpgData);
+                // The 'channel' field in the EPG data is the ID we need.
+                const epgChannelId = epgForChannel?.[0]?.channel;
+                if (epgChannelId) {
+                    // Construct the URL from the EPG channel ID as per user request.
+                    logoUrl = `https://gh.195656.xyz/https://github.com/fanmingming/live/blob/main/tv/${epgChannelId}.png`;
+                }
+            }
+            // A placeholder for channels that have no logo at all or if the logo fails to load.
+            const placeholderLogo = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Transparent pixel
+
             return (
             <li key={index} onClick={() => playChannel(channel)} className={nowPlaying === channel.name ? 'playing' : ''}>
                 <div className="channel-logo-container">
-                    <img src={channel.tvg.logo} alt={channel.name} />
+                    <img 
+                        src={logoUrl || placeholderLogo} 
+                        alt={channel.name}
+                        onError={(e) => {
+                            // If the logo fails to load, replace it with the placeholder to avoid a broken image icon.
+                            (e.target as HTMLImageElement).src = placeholderLogo;
+                        }}
+                    />
                 </div>
                 <div className="channel-info">
                     <span>{channel.name}</span>
