@@ -206,32 +206,63 @@ handleError(epgErr, 'Failed to load EPG data in background');
     const proxiedStreamUrl = `http://localhost:3000/proxy?url=${encodeURIComponent(originalStreamUrl)}`;
     const baseUrl = originalStreamUrl.substring(0, originalStreamUrl.lastIndexOf('/') + 1);
     const hlsConfig = { baseUrl: baseUrl, fLoader: CustomFragmentLoader };
+    const BLANK_VIDEO_SRC = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
-    setNowPlaying(channel.name);
+    // Defer state update to improve perceived performance
+    // setNowPlaying(channel.name); 
 
-    if (videoRef.current) {
-      if (Hls.isSupported()) {
-        if (hlsRef.current) {
-          hlsRef.current.destroy();
+    // --- Rigorous Cleanup Sequence ---
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    const video = videoRef.current;
+    if (video) {
+        video.pause();
+        video.src = BLANK_VIDEO_SRC; // Force-clear the last frame by loading a blank image
+        video.load(); // This is now fast because the source is tiny and local
+    }
+    // --- End of Cleanup ---
+
+    if (video) {
+      // A small delay can help prevent race conditions on some browsers
+      setTimeout(() => {
+        if (Hls.isSupported()) {
+          const hls = new Hls(hlsConfig);
+          hlsRef.current = hls;
+          hls.loadSource(proxiedStreamUrl);
+          hls.attachMedia(video);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            setNowPlaying(channel.name); // Update UI now that loading is complete
+            video.play().catch(() => console.error('视频播放被浏览器阻止。'));
+          });
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  console.error('HLS.js: fatal network error encountered, try to recover', data);
+                  hls.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  console.error('HLS.js: fatal media error encountered, try to recover', data);
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  console.error('HLS.js: unrecoverable fatal error', data);
+                  hls.destroy();
+                  handleError(data, 'HLS.js 致命错误');
+                  break;
+              }
+            } else {
+              console.warn('HLS.js: non-fatal error', data);
+            }
+          });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          setNowPlaying(channel.name);
+          video.src = proxiedStreamUrl;
+          video.play().catch(() => console.error('视频播放被浏览器阻止。'));
         }
-        const hls = new Hls(hlsConfig);
-        hlsRef.current = hls;
-        hls.loadSource(proxiedStreamUrl);
-        hls.attachMedia(videoRef.current);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          videoRef.current?.play().catch(() => console.error('视频播放被浏览器阻止。'));
-        });
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          if (data.fatal) {
-            handleError(data, 'HLS.js 致命错误');
-          }
-        });
-      } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-        videoRef.current.src = proxiedStreamUrl;
-        videoRef.current.addEventListener('loadedmetadata', () => {
-          videoRef.current?.play().catch(() => console.error('视频播放被浏览器阻止。'));
-        });
-      }
+      }, 50); // 50ms delay for safety
     }
   };
 
