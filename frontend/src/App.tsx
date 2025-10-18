@@ -117,7 +117,6 @@ function App() {
 
   // --- Performance Optimizations ---
   const sortedEpgKeys = useMemo(() => {
-    console.log('Performance: Re-sorting EPG keys.');
     return Object.keys(processedEpgData).sort((a, b) => b.length - a.length);
   }, [processedEpgData]);
 
@@ -127,12 +126,10 @@ function App() {
   ): Programme[] | undefined => {
     if (!channel) return undefined;
 
-    // 1. Try direct match (fastest and most accurate)
     if (processedEpgData[channel.name]) {
       return processedEpgData[channel.name];
     }
 
-    // 2. Try user's proposed logic (case-insensitive): playlist name contains EPG name.
     const channelNameLower = channel.name.toLowerCase();
     const matchingEpgKey = sortedEpgKeys.find(epgKey => channelNameLower.includes(epgKey.toLowerCase()));
 
@@ -178,7 +175,7 @@ function App() {
 
   const showGuide = useCallback((channel: Channel) => {
     if (guideChannel && guideChannel.name === channel.name) {
-        setGuideChannel(null); // Toggle off if same channel
+        setGuideChannel(null);
     } else {
         setGuideChannel(channel);
     }
@@ -188,7 +185,7 @@ function App() {
     setGuideChannel(null);
   }, []);
 
-  const loadEpgDataInBackground = async (currentEpgSources?: EpgSourceItem[]) => {
+  const loadEpgDataInBackground = useCallback(async (currentEpgSources?: EpgSourceItem[]) => {
     const sources = currentEpgSources || epgSources;
     const defaultEpg = sources.find(epg => epg.isDefault);
 
@@ -200,9 +197,9 @@ function App() {
             handleError(epgErr, 'Failed to load EPG data in background');
         }
     }
-  };
+  }, [epgSources]);
 
-  const handleLoad = async (playlist: PlaylistItem, currentEpgSources?: EpgSourceItem[]) => {
+  const handleLoad = useCallback(async (playlist: PlaylistItem, currentEpgSources?: EpgSourceItem[]) => {
     if (!playlist || !playlist.url) {
       setError('无效的播放列表。');
       return;
@@ -213,12 +210,11 @@ function App() {
     setProcessedEpgData({});
     setNowPlaying(null);
     setCurrentPlaylistName(playlist.name);
-    closeGuide(); // Close guide when loading new playlist
+    closeGuide();
 
     console.log('Loading playlist:', playlist);
     try {
       const response = await axios.get(`http://localhost:3000/playlist`, { params: { url: playlist.url } });
-      console.log('Playlist data:', response.data);
       setChannels(response.data);
       loadEpgDataInBackground(currentEpgSources);
     } catch (err: any) {
@@ -226,7 +222,7 @@ function App() {
       handleError(err, '加载播放列表失败。');
     }
     setLoading(false);
-  };
+  }, [closeGuide, loadEpgDataInBackground]);
 
   // --- Playlist Management ---
   const savePlaylists = (newPlaylists: PlaylistItem[]) => {
@@ -336,10 +332,22 @@ function App() {
     if (!channelEpg) return null;
 
     const now = new Date();
-    return channelEpg.find(prog => 
+
+    const currentProgram = channelEpg.find(prog => 
         new Date(prog.start) <= now &&
         new Date(prog.stop) > now
-    ) || null;
+    );
+    if (currentProgram) {
+        return currentProgram;
+    }
+
+    const NEXT_PROGRAM_THRESHOLD_MS = 15 * 60 * 1000;
+    const nextProgram = channelEpg
+      .filter(prog => new Date(prog.start) > now)
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+      .find(prog => (new Date(prog.start).getTime() - now.getTime()) < NEXT_PROGRAM_THRESHOLD_MS);
+
+    return nextProgram || null;
   }, [findEpgForChannel]);
 
   const renderChannelList = () => (

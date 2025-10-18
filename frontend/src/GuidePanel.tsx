@@ -17,7 +17,7 @@ export function GuidePanel({ channel, epgData, onClose }: GuidePanelProps) {
         behavior: 'smooth'
       });
     }
-  }, [channel]); // Scroll when channel changes
+  }, [channel, epgData]); // Scroll when channel changes OR when EPG data loads
 
   if (!channel) {
     return null;

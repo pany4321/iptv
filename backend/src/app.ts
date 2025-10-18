@@ -7,8 +7,14 @@ import { gunzip } from 'zlib';
 import { promisify } from 'util';
 import path from 'path';
 import fastifyStatic from '@fastify/static';
+import https from 'https'; // Import https module
 
 const gunzipAsync = promisify(gunzip);
+
+// Create an insecure HTTPS agent to bypass SSL/TLS errors
+const insecureAgent = new https.Agent({
+  rejectUnauthorized: false,
+});
 
 const app = Fastify({
   logger: true
@@ -19,8 +25,7 @@ app.register(fastifyStatic, {
   root: path.join(__dirname, '..', '..', 'frontend', 'dist'),
 });
 
-// SPA fallback: for any route that is not an API route or a static file, 
-// serve index.html and let the frontend router handle it.
+// SPA fallback
 app.setNotFoundHandler((req, reply) => {
   reply.sendFile('index.html');
 });
@@ -37,19 +42,15 @@ const CACHE_DURATION = 4 * 60 * 60 * 1000; // 4 hours
 // --- Helper Functions ---
 function parseXmltvDate(dateStr: string): string {
     if (!dateStr || dateStr.length < 14) {
-        // Invalid date string format, return as is or handle error
-        return new Date().toISOString(); // fallback to now
+        return new Date().toISOString();
     }
     const year = parseInt(dateStr.substring(0, 4), 10);
-    const month = parseInt(dateStr.substring(4, 6), 10) - 1; // JS months are 0-indexed
+    const month = parseInt(dateStr.substring(4, 6), 10) - 1;
     const day = parseInt(dateStr.substring(6, 8), 10);
     const hours = parseInt(dateStr.substring(8, 10), 10);
     const minutes = parseInt(dateStr.substring(10, 12), 10);
     const seconds = parseInt(dateStr.substring(12, 14), 10);
-
     const date = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
-
-    // Handle timezone offset if present
     if (dateStr.length > 15) {
         const offsetSign = dateStr.substring(15, 16) === '+' ? 1 : -1;
         const offsetHours = parseInt(dateStr.substring(16, 18), 10);
@@ -57,44 +58,29 @@ function parseXmltvDate(dateStr: string): string {
         const totalOffsetMinutes = (offsetHours * 60 + offsetMinutes) * offsetSign;
         date.setUTCMinutes(date.getUTCMinutes() - totalOffsetMinutes);
     }
-
     return date.toISOString();
 }
 
-
 // --- Routes ---
-
-app.get('/', async (request, reply) => {
-  return { hello: 'world' }
-});
-
 interface PlaylistQuery {
   url: string;
 }
 
 app.get<{ Querystring: PlaylistQuery }>('/playlist', async (request, reply) => {
   const { url } = request.query;
-
   if (!url) {
     reply.code(400).send({ error: 'url query parameter is required' });
     return;
   }
 
-  // --- BJYD Parser ---
   const parseBjydPlaylist = (data: string) => {
     const lines = data.split(/\r?\n/).filter(line => line.trim() !== '');
     const items = lines.map(line => {
       const parts = line.split(',');
-      if (parts.length < 2) {
-        return null;
-      }
+      if (parts.length < 2) return null;
       const name = parts[0].trim();
-      const url = parts.slice(1).join(',').trim(); // Join back in case URL contains commas
-
-      if (!name || !url) {
-        return null;
-      }
-
+      const url = parts.slice(1).join(',').trim();
+      if (!name || !url) return null;
       return {
         name: name,
         url: url,
@@ -102,16 +88,13 @@ app.get<{ Querystring: PlaylistQuery }>('/playlist', async (request, reply) => {
         group: { title: 'Default' },
       };
     }).filter((item): item is NonNullable<typeof item> => item !== null);
-
     return { items };
   };
 
   try {
-    const response = await axios.get(url, { proxy: false });
+    const response = await axios.get(url, { proxy: false, httpsAgent: insecureAgent });
     const playlistData: string = response.data;
     let playlist;
-
-    // Detect playlist format
     if (typeof playlistData === 'string' && !playlistData.includes('#EXTM3U')) {
       app.log.info('BJYD-like format detected. Using custom parser.');
       playlist = parseBjydPlaylist(playlistData);
@@ -119,7 +102,6 @@ app.get<{ Querystring: PlaylistQuery }>('/playlist', async (request, reply) => {
       app.log.info('M3U format detected. Using iptv-playlist-parser.');
       playlist = parsePlaylist(playlistData);
     }
-    
     reply.send(playlist.items);
   } catch (error) {
     app.log.error(error);
@@ -133,13 +115,11 @@ app.get<{ Querystring: PlaylistQuery }>('/playlist', async (request, reply) => {
 
 app.get<{ Querystring: { url: string } }>('/epg', async (request, reply) => {
     const { url } = request.query;
-
     if (!url) {
         reply.code(400).send({ error: 'url query parameter is required' });
         return;
     }
 
-    // Check cache
     const cachedTimestamp = epgCacheTimestamps.get(url);
     if (cachedTimestamp && (Date.now() - cachedTimestamp < CACHE_DURATION)) {
         app.log.info(`Returning cached EPG for ${url}`);
@@ -150,19 +130,17 @@ app.get<{ Querystring: { url: string } }>('/epg', async (request, reply) => {
     try {
         app.log.info(`Fetching EPG from ${url}`);
         let xmlData: string;
-
         if (url.endsWith('.gz')) {
-            const response = await axios.get(url, { proxy: false, responseType: 'arraybuffer' });
+            const response = await axios.get(url, { proxy: false, responseType: 'arraybuffer', httpsAgent: insecureAgent });
             const decompressed = await gunzipAsync(response.data);
             xmlData = decompressed.toString('utf-8');
         } else {
-            const response = await axios.get(url, { proxy: false, responseType: 'text' });
+            const response = await axios.get(url, { proxy: false, responseType: 'text', httpsAgent: insecureAgent });
             xmlData = response.data;
         }
 
         const parser = new XmlParser();
         const xmlDoc = await parser.parseStringPromise(xmlData);
-
         const programmes = xmlDoc.tv.programme.map((p: any) => {
             return {
                 channel: p.$.channel,
@@ -171,16 +149,11 @@ app.get<{ Querystring: { url: string } }>('/epg', async (request, reply) => {
                 start: parseXmltvDate(p.$.start),
                 stop: parseXmltvDate(p.$.stop),
             };
-        }).filter((p: any) => p.start && p.stop); // Filter out invalid records
-
+        }).filter((p: any) => p.start && p.stop);
         const epgData = { programmes };
-
-        // Store in cache
         epgCache.set(url, epgData);
         epgCacheTimestamps.set(url, Date.now());
-
         reply.send(epgData);
-
     } catch (error) {
         app.log.error(error);
         if (error instanceof Error) {
@@ -193,7 +166,6 @@ app.get<{ Querystring: { url: string } }>('/epg', async (request, reply) => {
 
 app.get<{ Querystring: { url: string } }>('/proxy', async (request, reply) => {
   const { url } = request.query;
-
   if (!url) {
     reply.code(400).send({ error: 'url query parameter is required' });
     return;
@@ -203,14 +175,12 @@ app.get<{ Querystring: { url: string } }>('/proxy', async (request, reply) => {
     const response = await axios({
       method: 'get',
       url: url,
-      responseType: 'arraybuffer', // Download content as a buffer
+      responseType: 'arraybuffer',
       proxy: false,
+      httpsAgent: insecureAgent,
     });
-
-    // Set the original Content-Type and send the buffered data
     reply.header('Content-Type', response.headers['content-type']);
     reply.send(response.data);
-
   } catch (error) {
     app.log.error(error);
     if (error instanceof Error) {
