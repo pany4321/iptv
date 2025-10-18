@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import Hls from 'hls.js';
 import { Settings } from './Settings';
@@ -38,6 +38,7 @@ export interface Programme {
 
 import { CustomFragmentLoader } from './hlsLoader';
 
+// --- Helper Functions (outside component for stability) ---
 const processEpgData = (programmes: Programme[]) => {
     const epgByChannel: { [key: string]: Programme[] } = {};
     for (const programme of programmes) {
@@ -49,12 +50,47 @@ const processEpgData = (programmes: Programme[]) => {
     return epgByChannel;
 };
 
-const handleError = (error: any, message: string) => {
-    console.error(message, error);
-    if (message !== 'Failed to load EPG data in background') {
-      setError(error.response?.data?.details || message);
-    }
-  }
+const placeholderLogo = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Transparent pixel
+
+// --- Memoized Channel List Item Component ---
+const ChannelListItem = React.memo(({
+    channel,
+    isPlaying,
+    isGuideOpen,
+    currentProgram,
+    logoUrl,
+    onPlay,
+    onShowGuide
+}: {
+    channel: Channel;
+    isPlaying: boolean;
+    isGuideOpen: boolean;
+    currentProgram: Programme | null;
+    logoUrl: string;
+    onPlay: (channel: Channel) => void;
+    onShowGuide: (channel: Channel) => void;
+}) => {
+    return (
+        <li onClick={() => onPlay(channel)} className={isPlaying ? 'playing' : ''}>
+            <div className="channel-logo-container">
+                <img 
+                    src={logoUrl || placeholderLogo} 
+                    alt={channel.name}
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).src = placeholderLogo;
+                    }}
+                />
+            </div>
+            <div className="channel-info">
+                <span>{channel.name}</span>
+                <small className="current-program"><span style={{display: 'inline-block'}}>{currentProgram?.title || ' ' }</span></small>
+            </div>
+            <button className="guide-button" title="节目单" onClick={(e) => { e.stopPropagation(); onShowGuide(channel); }}>
+                {isGuideOpen ? '«' : '»'}
+            </button>
+        </li>
+    );
+});
 
 function App() {
   const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
@@ -72,32 +108,40 @@ function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
 
+  const handleError = (error: any, message: string) => {
+    console.error(message, error);
+    if (message !== 'Failed to load EPG data in background') {
+      setError(error.response?.data?.details || message);
+    }
+  }
+
+  // --- Performance Optimizations ---
+  const sortedEpgKeys = useMemo(() => {
+    console.log('Performance: Re-sorting EPG keys.');
+    return Object.keys(processedEpgData).sort((a, b) => b.length - a.length);
+  }, [processedEpgData]);
+
   // --- EPG Fuzzy Matching Helpers ---
-  const findEpgForChannel = (
+  const findEpgForChannel = useCallback((
     channel: Channel | null,
-    epgData: { [key: string]: Programme[] }
   ): Programme[] | undefined => {
     if (!channel) return undefined;
 
     // 1. Try direct match (fastest and most accurate)
-    if (epgData[channel.name]) {
-      return epgData[channel.name];
+    if (processedEpgData[channel.name]) {
+      return processedEpgData[channel.name];
     }
 
     // 2. Try user's proposed logic (case-insensitive): playlist name contains EPG name.
-    const channelNameLower = channel.name.toLowerCase(); // Convert playlist name to lowercase once.
-
-    const sortedEpgKeys = Object.keys(epgData).sort((a, b) => b.length - a.length);
-
+    const channelNameLower = channel.name.toLowerCase();
     const matchingEpgKey = sortedEpgKeys.find(epgKey => channelNameLower.includes(epgKey.toLowerCase()));
 
     if (matchingEpgKey) {
-      console.log(`Fuzzy match found for '${channel.name}': using EPG from '${matchingEpgKey}'`);
-      return epgData[matchingEpgKey];
+      return processedEpgData[matchingEpgKey];
     }
 
     return undefined;
-  };
+  }, [processedEpgData, sortedEpgKeys]);
 
   useEffect(() => {
     const savedPlaylists: PlaylistItem[] = JSON.parse(localStorage.getItem('playlists') || '[]');
@@ -112,6 +156,7 @@ function App() {
     } else if (savedPlaylists.length > 0) {
       handleLoad(savedPlaylists[0], savedEpgSources);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -131,17 +176,17 @@ function App() {
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };
 
-  const showGuide = (channel: Channel) => {
+  const showGuide = useCallback((channel: Channel) => {
     if (guideChannel && guideChannel.name === channel.name) {
         setGuideChannel(null); // Toggle off if same channel
     } else {
         setGuideChannel(channel);
     }
-  };
+  }, [guideChannel]);
 
-  const closeGuide = () => {
+  const closeGuide = useCallback(() => {
     setGuideChannel(null);
-  };
+  }, []);
 
   const loadEpgDataInBackground = async (currentEpgSources?: EpgSourceItem[]) => {
     const sources = currentEpgSources || epgSources;
@@ -152,7 +197,7 @@ function App() {
             const epgResponse = await axios.get(`http://localhost:3000/epg`, { params: { url: defaultEpg.url } });
             setProcessedEpgData(processEpgData(epgResponse.data.programmes));
         } catch (epgErr: any) {
-handleError(epgErr, 'Failed to load EPG data in background');
+            handleError(epgErr, 'Failed to load EPG data in background');
         }
     }
   };
@@ -175,7 +220,6 @@ handleError(epgErr, 'Failed to load EPG data in background');
       const response = await axios.get(`http://localhost:3000/playlist`, { params: { url: playlist.url } });
       console.log('Playlist data:', response.data);
       setChannels(response.data);
-      // EPG data is now loaded in the background, not blocking the UI
       loadEpgDataInBackground(currentEpgSources);
     } catch (err: any) {
       console.error('Failed to load playlist:', err);
@@ -228,17 +272,13 @@ handleError(epgErr, 'Failed to load EPG data in background');
     saveEpgSources(updatedEpgs);
   };
 
-  const playChannel = (channel: Channel) => {
+  const playChannel = useCallback((channel: Channel) => {
     const originalStreamUrl = channel.url;
     const proxiedStreamUrl = `http://localhost:3000/proxy?url=${encodeURIComponent(originalStreamUrl)}`;
     const baseUrl = originalStreamUrl.substring(0, originalStreamUrl.lastIndexOf('/') + 1);
     const hlsConfig = { baseUrl: baseUrl, fLoader: CustomFragmentLoader };
     const BLANK_VIDEO_SRC = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
-    // Defer state update to improve perceived performance
-    // setNowPlaying(channel.name); 
-
-    // --- Rigorous Cleanup Sequence ---
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -246,13 +286,11 @@ handleError(epgErr, 'Failed to load EPG data in background');
     const video = videoRef.current;
     if (video) {
         video.pause();
-        video.src = BLANK_VIDEO_SRC; // Force-clear the last frame by loading a blank image
-        video.load(); // This is now fast because the source is tiny and local
+        video.src = BLANK_VIDEO_SRC;
+        video.load();
     }
-    // --- End of Cleanup ---
 
     if (video) {
-      // A small delay can help prevent race conditions on some browsers
       setTimeout(() => {
         if (Hls.isSupported()) {
           const hls = new Hls(hlsConfig);
@@ -260,7 +298,7 @@ handleError(epgErr, 'Failed to load EPG data in background');
           hls.loadSource(proxiedStreamUrl);
           hls.attachMedia(video);
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            setNowPlaying(channel.name); // Update UI now that loading is complete
+            setNowPlaying(channel.name);
             video.play().catch(() => console.error('视频播放被浏览器阻止。'));
           });
           hls.on(Hls.Events.ERROR, (event, data) => {
@@ -289,12 +327,12 @@ handleError(epgErr, 'Failed to load EPG data in background');
           video.src = proxiedStreamUrl;
           video.play().catch(() => console.error('视频播放被浏览器阻止。'));
         }
-      }, 50); // 50ms delay for safety
+      }, 50);
     }
-  };
+  }, []);
 
-  const findCurrentProgram = (channel: Channel): Programme | null => {
-    const channelEpg = findEpgForChannel(channel, processedEpgData);
+  const findCurrentProgram = useCallback((channel: Channel): Programme | null => {
+    const channelEpg = findEpgForChannel(channel);
     if (!channelEpg) return null;
 
     const now = new Date();
@@ -302,7 +340,7 @@ handleError(epgErr, 'Failed to load EPG data in background');
         new Date(prog.start) <= now &&
         new Date(prog.stop) > now
     ) || null;
-  };
+  }, [findEpgForChannel]);
 
   const renderChannelList = () => (
     <aside className="channel-list-sidebar">
@@ -313,44 +351,30 @@ handleError(epgErr, 'Failed to load EPG data in background');
             </button>
         </div>
         {loading ? <p style={{padding: '1rem'}}>加载中...</p> : <ul>
-        {channels.map((channel, index) => {
+        {channels.map((channel) => {
             const currentProgram = findCurrentProgram(channel);
             const isGuideOpenForThisChannel = guideChannel?.name === channel.name;
-
-            // --- Auto-fetch Logo Logic ---
+            
             let logoUrl = channel.tvg.logo;
             if (!logoUrl) {
-                const epgForChannel = findEpgForChannel(channel, processedEpgData);
-                // The 'channel' field in the EPG data is the ID we need.
+                const epgForChannel = findEpgForChannel(channel);
                 const epgChannelId = epgForChannel?.[0]?.channel;
                 if (epgChannelId) {
-                    // Construct the URL from the EPG channel ID as per user request.
                     logoUrl = `https://gh.195656.xyz/https://github.com/fanmingming/live/blob/main/tv/${epgChannelId}.png`;
                 }
             }
-            // A placeholder for channels that have no logo at all or if the logo fails to load.
-            const placeholderLogo = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Transparent pixel
 
             return (
-            <li key={index} onClick={() => playChannel(channel)} className={nowPlaying === channel.name ? 'playing' : ''}>
-                <div className="channel-logo-container">
-                    <img 
-                        src={logoUrl || placeholderLogo} 
-                        alt={channel.name}
-                        onError={(e) => {
-                            // If the logo fails to load, replace it with the placeholder to avoid a broken image icon.
-                            (e.target as HTMLImageElement).src = placeholderLogo;
-                        }}
-                    />
-                </div>
-                <div className="channel-info">
-                    <span>{channel.name}</span>
-                    <small className="current-program"><span style={{display: 'inline-block'}}>{currentProgram?.title || ' ' }</span></small>
-                </div>
-                <button className="guide-button" title="节目单" onClick={(e) => { e.stopPropagation(); showGuide(channel); }}>
-                    {isGuideOpenForThisChannel ? '«' : '»'}
-                </button>
-            </li>
+                <ChannelListItem
+                    key={channel.url} 
+                    channel={channel}
+                    isPlaying={nowPlaying === channel.name}
+                    isGuideOpen={isGuideOpenForThisChannel}
+                    currentProgram={currentProgram}
+                    logoUrl={logoUrl}
+                    onPlay={playChannel}
+                    onShowGuide={showGuide}
+                />
             )
         })}
         </ul>}
@@ -383,7 +407,7 @@ handleError(epgErr, 'Failed to load EPG data in background');
       </header>
       <main className="App-main">
         {renderChannelList()}
-        {guideChannel && <GuidePanel channel={guideChannel} epgData={findEpgForChannel(guideChannel, processedEpgData)} onClose={closeGuide} />}
+        {guideChannel && <GuidePanel channel={guideChannel} epgData={findEpgForChannel(guideChannel)} onClose={closeGuide} />}
         <section className="player-section">
           <video ref={videoRef} controls width="100%" height="100%" />
           {!nowPlaying && (
