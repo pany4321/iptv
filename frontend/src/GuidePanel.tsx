@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import type { Channel, Programme } from './App';
 
 interface GuidePanelProps {

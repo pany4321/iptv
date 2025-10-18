@@ -293,7 +293,7 @@ function App() {
     if (video) {
       setTimeout(() => {
         if (Hls.isSupported()) {
-          const hls = new Hls(hlsConfig);
+          const hls = new Hls(hlsConfig as any);
           hlsRef.current = hls;
           hls.loadSource(proxiedStreamUrl);
           hls.attachMedia(video);
@@ -301,7 +301,7 @@ function App() {
             setNowPlaying(channel.name);
             video.play().catch(() => console.error('视频播放被浏览器阻止。'));
           });
-          hls.on(Hls.Events.ERROR, (event, data) => {
+          hls.on(Hls.Events.ERROR, (_event, data) => {
             if (data.fatal) {
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
@@ -388,7 +388,8 @@ function App() {
           <h1>IPTV 播放器</h1>
         </div>
         <div className="header-status-message">
-            {!nowPlaying && (
+            {error && <p className="error-message">错误: {error}</p>}
+            {!error && !nowPlaying && (
                 <p>{playlists.length === 0 && !loading ? '请点击右上角设置按钮，添加您的第一个播放列表。' : '请选择一个频道进行播放'}</p>
             )}
         </div>

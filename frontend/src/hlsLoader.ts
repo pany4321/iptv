@@ -1,4 +1,4 @@
-import Hls from 'hls.js';
+import Hls, { LoaderContext, LoaderConfiguration, LoaderCallbacks } from 'hls.js';
 
 export class CustomFragmentLoader extends Hls.DefaultConfig.loader {
   baseUrl: string;
@@ -7,7 +7,7 @@ export class CustomFragmentLoader extends Hls.DefaultConfig.loader {
     this.baseUrl = config.baseUrl;
     this.load = this.load.bind(this);
   }
-  load(context: any, config: any, callbacks: any) {
+  load(context: LoaderContext, config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>) {
     let url = context.url;
     const isLocalhostUrl = url.includes('//localhost');
     if (!/^(https?:)?\/\//.test(url) || isLocalhostUrl) {
