@@ -72,6 +72,33 @@ function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
 
+  // --- EPG Fuzzy Matching Helpers ---
+  const findEpgForChannel = (
+    channel: Channel | null,
+    epgData: { [key: string]: Programme[] }
+  ): Programme[] | undefined => {
+    if (!channel) return undefined;
+
+    // 1. Try direct match (fastest and most accurate)
+    if (epgData[channel.name]) {
+      return epgData[channel.name];
+    }
+
+    // 2. Try user's proposed logic (case-insensitive): playlist name contains EPG name.
+    const channelNameLower = channel.name.toLowerCase(); // Convert playlist name to lowercase once.
+
+    const sortedEpgKeys = Object.keys(epgData).sort((a, b) => b.length - a.length);
+
+    const matchingEpgKey = sortedEpgKeys.find(epgKey => channelNameLower.includes(epgKey.toLowerCase()));
+
+    if (matchingEpgKey) {
+      console.log(`Fuzzy match found for '${channel.name}': using EPG from '${matchingEpgKey}'`);
+      return epgData[matchingEpgKey];
+    }
+
+    return undefined;
+  };
+
   useEffect(() => {
     const savedPlaylists: PlaylistItem[] = JSON.parse(localStorage.getItem('playlists') || '[]');
     setPlaylists(savedPlaylists);
@@ -267,7 +294,7 @@ handleError(epgErr, 'Failed to load EPG data in background');
   };
 
   const findCurrentProgram = (channel: Channel): Programme | null => {
-    const channelEpg = processedEpgData[channel.name];
+    const channelEpg = findEpgForChannel(channel, processedEpgData);
     if (!channelEpg) return null;
 
     const now = new Date();
@@ -334,7 +361,7 @@ handleError(epgErr, 'Failed to load EPG data in background');
       </header>
       <main className="App-main">
         {renderChannelList()}
-        {guideChannel && <GuidePanel channel={guideChannel} epgData={processedEpgData[guideChannel.name]} onClose={closeGuide} />}
+        {guideChannel && <GuidePanel channel={guideChannel} epgData={findEpgForChannel(guideChannel, processedEpgData)} onClose={closeGuide} />}
         <section className="player-section">
           <video ref={videoRef} controls width="100%" height="100%" />
           {!nowPlaying && (

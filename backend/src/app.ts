@@ -67,9 +67,46 @@ app.get<{ Querystring: PlaylistQuery }>('/playlist', async (request, reply) => {
     return;
   }
 
+  // --- BJYD Parser ---
+  const parseBjydPlaylist = (data: string) => {
+    const lines = data.split(/\r?\n/).filter(line => line.trim() !== '');
+    const items = lines.map(line => {
+      const parts = line.split(',');
+      if (parts.length < 2) {
+        return null;
+      }
+      const name = parts[0].trim();
+      const url = parts.slice(1).join(',').trim(); // Join back in case URL contains commas
+
+      if (!name || !url) {
+        return null;
+      }
+
+      return {
+        name: name,
+        url: url,
+        tvg: { id: '', name: name, logo: '', url: '', rec: '' },
+        group: { title: 'Default' },
+      };
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
+
+    return { items };
+  };
+
   try {
     const response = await axios.get(url, { proxy: false });
-    const playlist = parsePlaylist(response.data);
+    const playlistData: string = response.data;
+    let playlist;
+
+    // Detect playlist format
+    if (typeof playlistData === 'string' && !playlistData.includes('#EXTM3U')) {
+      app.log.info('BJYD-like format detected. Using custom parser.');
+      playlist = parseBjydPlaylist(playlistData);
+    } else {
+      app.log.info('M3U format detected. Using iptv-playlist-parser.');
+      playlist = parsePlaylist(playlistData);
+    }
+    
     reply.send(playlist.items);
   } catch (error) {
     app.log.error(error);
