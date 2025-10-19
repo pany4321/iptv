@@ -15,7 +15,8 @@ This project is an IPTV web player. It allows users to manage IPTV playlists, br
   - Node.js
   - Fastify
   - `iptv-playlist-parser` for parsing M3U playlists
-  - Axios for fetching external resources
+  - `curl`: Used via `child_process` to fetch external playlists and EPG files. This was implemented to bypass Cloudflare bot detection and handle servers with invalid SSL certificates.
+  - `axios`: Used for proxying video streams.
 - **Testing:**
   - `tap` and `nock` for backend testing
 

@@ -1,5 +1,4 @@
 import Fastify from 'fastify';
-import axios from 'axios';
 import { parse as parsePlaylist } from 'iptv-playlist-parser';
 import { Parser as XmlParser } from 'xml2js';
 import cors from '@fastify/cors';
@@ -7,14 +6,11 @@ import { gunzip } from 'zlib';
 import { promisify } from 'util';
 import path from 'path';
 import fastifyStatic from '@fastify/static';
-import https from 'https'; // Import https module
+import { execFile } from 'child_process';
+import axios from 'axios'; // Keep for proxy
 
 const gunzipAsync = promisify(gunzip);
-
-// Create an insecure HTTPS agent to bypass SSL/TLS errors
-const insecureAgent = new https.Agent({
-  rejectUnauthorized: false,
-});
+const execFileAsync = promisify(execFile);
 
 const app = Fastify({
   logger: true
@@ -66,6 +62,8 @@ interface PlaylistQuery {
   url: string;
 }
 
+const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36";
+
 app.get<{ Querystring: PlaylistQuery }>('/playlist', async (request, reply) => {
   const { url } = request.query;
   if (!url) {
@@ -92,8 +90,23 @@ app.get<{ Querystring: PlaylistQuery }>('/playlist', async (request, reply) => {
   };
 
   try {
-    const response = await axios.get(url, { proxy: false, httpsAgent: insecureAgent });
-    const playlistData: string = response.data;
+    /*
+     * Use curl via execFile to fetch remote resources.
+     * This approach is used instead of a standard HTTP client like axios because:
+     * 1. It bypasses Cloudflare's bot detection that blocks default Node.js/axios requests.
+     * 2. It allows ignoring SSL certificate errors for local/private servers using the -k flag.
+     *
+     * curl arguments:
+     * -L: Follow redirects.
+     * -k: Insecure. Ignore SSL certificate validation.
+     * -A: User-Agent. Impersonate a browser.
+     * --compressed: Request a compressed response and decompress it automatically.
+     */
+    // Use execFile for security to prevent command injection
+    const args = ['-L', '-k', '-A', userAgent, '--compressed', url];
+    const { stdout } = await execFileAsync('curl', args);
+    const playlistData: string = stdout;
+
     let playlist;
     if (typeof playlistData === 'string' && !playlistData.includes('#EXTM3U')) {
       app.log.info('BJYD-like format detected. Using custom parser.');
@@ -104,12 +117,8 @@ app.get<{ Querystring: PlaylistQuery }>('/playlist', async (request, reply) => {
     }
     reply.send(playlist.items);
   } catch (error) {
-    app.log.error(error);
-    if (error instanceof Error) {
-        reply.code(500).send({ error: 'Failed to fetch or parse playlist', details: error.message });
-    } else {
-        reply.code(500).send({ error: 'Failed to fetch or parse playlist', details: 'An unknown error occurred' });
-    }
+    app.log.error(error); // Log detailed error for server-side debugging
+    reply.code(500).send({ error: '获取播放列表失败', details: '请检查网络连接或URL地址是否正确。' });
   }
 });
 
@@ -129,14 +138,29 @@ app.get<{ Querystring: { url: string } }>('/epg', async (request, reply) => {
 
     try {
         app.log.info(`Fetching EPG from ${url}`);
+        /*
+         * Use curl via execFile to fetch remote resources.
+         * This approach is used instead of a standard HTTP client like axios because:
+         * 1. It bypasses Cloudflare's bot detection that blocks default Node.js/axios requests.
+         * 2. It allows ignoring SSL certificate errors for local/private servers using the -k flag.
+         *
+         * curl arguments:
+         * -L: Follow redirects.
+         * -k: Insecure. Ignore SSL certificate validation.
+         * -A: User-Agent. Impersonate a browser.
+         * --compressed: Request a compressed response and decompress it automatically.
+         */
+        // Use execFile for security to prevent command injection
+        const args = ['-L', '-k', '-A', userAgent, '--compressed', url];
+        
         let xmlData: string;
         if (url.endsWith('.gz')) {
-            const response = await axios.get(url, { proxy: false, responseType: 'arraybuffer', httpsAgent: insecureAgent });
-            const decompressed = await gunzipAsync(response.data);
+            const { stdout } = await execFileAsync('curl', args, { encoding: 'buffer' });
+            const decompressed = await gunzipAsync(stdout);
             xmlData = decompressed.toString('utf-8');
         } else {
-            const response = await axios.get(url, { proxy: false, responseType: 'text', httpsAgent: insecureAgent });
-            xmlData = response.data;
+            const { stdout } = await execFileAsync('curl', args);
+            xmlData = stdout;
         }
 
         const parser = new XmlParser();
@@ -155,12 +179,8 @@ app.get<{ Querystring: { url: string } }>('/epg', async (request, reply) => {
         epgCacheTimestamps.set(url, Date.now());
         reply.send(epgData);
     } catch (error) {
-        app.log.error(error);
-        if (error instanceof Error) {
-            reply.code(500).send({ error: 'Failed to fetch or parse EPG data', details: error.message });
-        } else {
-            reply.code(500).send({ error: 'Failed to fetch or parse EPG data', details: 'An unknown error occurred' });
-        }
+        app.log.error(error); // Log detailed error for server-side debugging
+        reply.code(500).send({ error: '获取节目单失败', details: '请检查网络连接或URL地址是否正确。' });
     }
 });
 
@@ -177,7 +197,6 @@ app.get<{ Querystring: { url: string } }>('/proxy', async (request, reply) => {
       url: url,
       responseType: 'arraybuffer',
       proxy: false,
-      httpsAgent: insecureAgent,
     });
     reply.header('Content-Type', response.headers['content-type']);
     reply.send(response.data);

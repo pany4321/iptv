@@ -4,7 +4,7 @@
 TBD - created by archiving change create-iptv-web-player. Update Purpose after archive.
 ## Requirements
 ### Requirement: 播放HLS直播流
-系统 SHALL 能够接收一个 HLS 格式的 URL (`.m3u8`) 并在视频播放器中播放。
+系统 SHALL 能够接收一个 HLS 格式的 URL (`.m3u8`) 并在视频播放器中播放。该功能通过 `HLS.js` 库实现。
 
 #### Scenario: 用户选择一个频道进行播放
 - **GIVEN** 用户在频道列表中选择了一个有效的频道
