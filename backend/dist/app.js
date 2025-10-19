@@ -21,7 +21,8 @@ const app = (0, fastify_1.default)({
 // Serve frontend files
 app.register(static_1.default, {
     root: path_1.default.join(__dirname, '..', '..', 'frontend', 'dist'),
-});
+//    root: path_1.default.join(__dirname, 'static'),
+}); 
 // SPA fallback
 app.setNotFoundHandler((req, reply) => {
     reply.sendFile('index.html');
