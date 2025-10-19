@@ -272,7 +272,11 @@ function App() {
     const originalStreamUrl = channel.url;
     const proxiedStreamUrl = `http://localhost:3000/proxy?url=${encodeURIComponent(originalStreamUrl)}`;
     const baseUrl = originalStreamUrl.substring(0, originalStreamUrl.lastIndexOf('/') + 1);
-    const hlsConfig = { baseUrl: baseUrl, fLoader: CustomFragmentLoader };
+    const hlsConfig = {
+      ...{ baseUrl: baseUrl, fLoader: CustomFragmentLoader },
+      liveSyncDurationCount: 1, // Keep only 1 segment from the live edge
+      liveMaxLatencyDurationCount: 2, // Jump to live if latency is > 2 segments
+    };
     const BLANK_VIDEO_SRC = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
     if (hlsRef.current) {
