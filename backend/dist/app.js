@@ -10,6 +10,7 @@ const cors_1 = __importDefault(require("@fastify/cors"));
 const zlib_1 = require("zlib");
 const util_1 = require("util");
 const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const static_1 = __importDefault(require("@fastify/static"));
 const child_process_1 = require("child_process");
 const axios_1 = __importDefault(require("axios")); // Keep for proxy
@@ -19,8 +20,13 @@ const app = (0, fastify_1.default)({
     logger: true
 });
 // Serve frontend files
+const frontendDistPath = path_1.default.join(__dirname, '..', '..', 'frontend', 'dist');
+const publicPath = path_1.default.join(__dirname, 'public');
+const staticRootPath = fs_1.default.existsSync(publicPath)
+    ? publicPath // Production: serve from 'publish/public'
+    : frontendDistPath; // Development: serve from 'frontend/dist'
 app.register(static_1.default, {
-    root: path_1.default.join(__dirname, '..', '..', 'frontend', 'dist'),
+    root: staticRootPath,
 });
 // SPA fallback
 app.setNotFoundHandler((req, reply) => {

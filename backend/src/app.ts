@@ -5,6 +5,7 @@ import cors from '@fastify/cors';
 import { gunzip } from 'zlib';
 import { promisify } from 'util';
 import path from 'path';
+import fs from 'fs';
 import fastifyStatic from '@fastify/static';
 import { execFile } from 'child_process';
 import axios from 'axios'; // Keep for proxy
@@ -17,8 +18,15 @@ const app = Fastify({
 });
 
 // Serve frontend files
+const frontendDistPath = path.join(__dirname, '..', '..', 'frontend', 'dist');
+const publicPath = path.join(__dirname, 'public');
+
+const staticRootPath = fs.existsSync(publicPath)
+  ? publicPath // Production: serve from 'publish/public'
+  : frontendDistPath; // Development: serve from 'frontend/dist'
+
 app.register(fastifyStatic, {
-  root: path.join(__dirname, '..', '..', 'frontend', 'dist'),
+  root: staticRootPath,
 });
 
 // SPA fallback
