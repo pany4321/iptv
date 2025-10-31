@@ -19,7 +19,7 @@ export class CustomFragmentLoader extends Hls.DefaultConfig.loader {
       }
       url = this.baseUrl + url;
     }
-    context.url = `http://localhost:3000/proxy?url=${encodeURIComponent(url)}`;
+    context.url = `/proxy?url=${encodeURIComponent(url)}`;
     super.load(context, config, callbacks);
   }
 }

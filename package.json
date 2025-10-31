@@ -2,12 +2,14 @@
   "name": "iptv-player-monorepo",
   "version": "1.0.0",
   "description": "Build and packaging scripts for the IPTV player.",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "postinstall": "npm run install:all",
-    "install:all": "npm install --prefix backend && npm install --prefix frontend",
-    "build:frontend": "npm run build --prefix frontend",
-    "build:backend": "npm run build --prefix backend",
-    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend",
+    "build": "npm run build --workspaces",
     "prepackage": "npm run build",
     "package": "npm run build && node package.js",
     "start": "cd publish && npm install --omit=dev && node index.js"

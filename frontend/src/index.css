@@ -627,3 +627,124 @@ body {
   cursor: not-allowed;
 }
 
+/* --- Responsive Styles for Mobile --- */
+@media (max-width: 768px) {
+  .App-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .App-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .header-status-message {
+    display: none; /* Hide status message in header on mobile to save space */
+  }
+
+  .App-main {
+    flex-direction: column; /* Stack player and list vertically */
+  }
+
+  .player-section {
+    height: 40vh; /* Player takes top 40% of viewport height */
+    width: 100%;
+  }
+
+  .channel-list-sidebar {
+    width: 100%;
+    max-width: none; /* Override desktop max-width */
+    height: calc(100vh - 40vh - 60px); /* Fill remaining space (viewport - player - header) */
+    border-right: none; /* Remove vertical border */
+    border-top: 1px solid var(--border-color);
+  }
+
+  /* Hide the desktop sidebar toggle button */
+  .sidebar-toggle-button {
+    display: none;
+  }
+
+  /* Don't apply collapsed styles on mobile */
+  .App.sidebar-collapsed .channel-list-sidebar {
+    width: 100%;
+  }
+  .App.sidebar-collapsed .playlist-sidebar-header {
+      padding: 1rem 1.5rem;
+      justify-content: space-between;
+  }
+  .App.sidebar-collapsed .playlist-sidebar-header .playlist-switcher-container {
+      display: block;
+  }
+  .App.sidebar-collapsed .channel-info,
+  .App.sidebar-collapsed .guide-button {
+      display: flex;
+  }
+  .App.sidebar-collapsed .channel-list-sidebar li {
+      justify-content: flex-start;
+      padding: 0.75rem 1.5rem;
+  }
+  .App.sidebar-collapsed .channel-logo-container {
+      margin-right: 1rem;
+  }
+
+  .channel-info {
+    margin-right: 3.5rem; /* Adjust for guide button */
+  }
+
+  /* Make the guide panel a full-screen modal */
+  .guide-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    border-radius: 0;
+    z-index: 1000;
+  }
+
+  /* Make settings modal full-screen */
+  .modal-content {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+
+  .modal-body-columns {
+    flex-direction: column;
+  }
+
+  .settings-menu {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    padding: 0;
+    overflow-x: auto;
+  }
+
+  .settings-menu ul {
+    display: flex;
+    width: 100%;
+  }
+
+  .settings-menu li {
+    flex: 1;
+    text-align: center;
+    padding: 1rem;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+  }
+
+  .settings-menu li.active {
+    border-left-color: transparent;
+    border-bottom-color: var(--primary);
+  }
+
+  .add-playlist-form {
+    flex-direction: column;
+  }
+}
+
+

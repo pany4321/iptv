@@ -200,12 +200,22 @@ app.get<{ Querystring: { url: string } }>('/proxy', async (request, reply) => {
   }
 
   try {
+    // Forward important headers from the client to the target server
+    const headers: Record<string, string> = {
+      'User-Agent': request.headers['user-agent'] || userAgent, // Fallback to default UA
+    };
+    if (request.headers['referer']) {
+      headers['Referer'] = request.headers['referer'];
+    }
+
     const response = await axios({
       method: 'get',
       url: url,
       responseType: 'arraybuffer',
+      headers: headers,
       proxy: false,
     });
+
     reply.header('Content-Type', response.headers['content-type']);
     reply.send(response.data);
   } catch (error) {

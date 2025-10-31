@@ -191,7 +191,7 @@ function App() {
 
     if (defaultEpg) {
         try {
-            const epgResponse = await axios.get(`http://localhost:3000/epg`, { params: { url: defaultEpg.url } });
+            const epgResponse = await axios.get(`/epg`, { params: { url: defaultEpg.url } });
             setProcessedEpgData(processEpgData(epgResponse.data.programmes));
         } catch (epgErr: any) {
             handleError(epgErr, 'Failed to load EPG data in background');
@@ -214,7 +214,7 @@ function App() {
 
     console.log('Loading playlist:', playlist);
     try {
-      const response = await axios.get(`http://localhost:3000/playlist`, { params: { url: playlist.url } });
+      const response = await axios.get(`/playlist`, { params: { url: playlist.url } });
       setChannels(response.data);
       loadEpgDataInBackground(currentEpgSources);
     } catch (err: any) {
@@ -270,12 +270,21 @@ function App() {
 
   const playChannel = useCallback((channel: Channel) => {
     const originalStreamUrl = channel.url;
-    const proxiedStreamUrl = `http://localhost:3000/proxy?url=${encodeURIComponent(originalStreamUrl)}`;
+    const proxiedStreamUrl = `/proxy?url=${encodeURIComponent(originalStreamUrl)}`;
     const baseUrl = originalStreamUrl.substring(0, originalStreamUrl.lastIndexOf('/') + 1);
     const hlsConfig = {
       ...{ baseUrl: baseUrl, fLoader: CustomFragmentLoader },
-      liveSyncDurationCount: 1, // Keep only 1 segment from the live edge
-      liveMaxLatencyDurationCount: 2, // Jump to live if latency is > 2 segments
+      // --- General Buffer Settings ---
+      maxBufferSize: 60, // Max buffer size in seconds
+      maxMaxBufferLength: 120, // Max overall buffer length
+
+      // --- Live Stream Specific Settings for Stability ---
+      liveSyncDurationCount: 3, // More segments from live edge for stability
+      liveMaxLatencyDurationCount: 5, // Allow more latency before seeking to live
+
+      // --- Retry Logic ---
+      fragLoadingMaxRetry: 4, // Retry fragment loading 4 times
+      levelLoadingMaxRetry: 4, // Retry level loading 4 times
     };
     const BLANK_VIDEO_SRC = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
