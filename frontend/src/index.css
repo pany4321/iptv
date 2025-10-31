@@ -697,6 +697,10 @@ body {
       margin-right: 1rem;
   }
 
+  .guide-button {
+    opacity: 1; /* Always visible on mobile */
+  }
+
   .channel-info {
     margin-right: 3.5rem; /* Adjust for guide button */
   }

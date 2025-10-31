@@ -426,6 +426,7 @@ function App() {
       </header>
       <main className="App-main">
         {renderChannelList()}
+        {guideChannel && <GuidePanel channel={guideChannel} epgData={findEpgForChannel(guideChannel)} onClose={closeGuide} />}
         <section className="player-section">
             <video ref={videoRef} controls width="100%" height="100%" />
             {!nowPlaying && (
@@ -437,7 +438,6 @@ function App() {
                 </div>
             )}
         </section>
-        {guideChannel && <GuidePanel channel={guideChannel} epgData={findEpgForChannel(guideChannel)} onClose={closeGuide} />}
       </main>
       <Settings 
         isOpen={isSettingsOpen} 
