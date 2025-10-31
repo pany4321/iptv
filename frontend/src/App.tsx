@@ -331,11 +331,7 @@ function App() {
               console.warn('HLS.js: non-fatal error', data);
             }
           });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          setNowPlaying(channel.name);
-          video.src = proxiedStreamUrl;
-          video.play().catch(() => console.error('视频播放被浏览器阻止。'));
-        }
+        } 
       }, 50);
     }
   }, []);

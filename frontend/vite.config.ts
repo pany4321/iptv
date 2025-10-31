@@ -6,9 +6,18 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/playlist': 'http://localhost:3000',
-      '/epg': 'http://localhost:3000',
-      '/proxy': 'http://localhost:3000',
+      '/playlist': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/epg': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/proxy': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     }
   }
 })

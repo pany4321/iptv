@@ -7,8 +7,8 @@ import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 import fastifyStatic from '@fastify/static';
-import { execFile } from 'child_process';
-import axios from 'axios'; // Keep for proxy
+import { spawn, execFile } from 'child_process';
+
 
 const gunzipAsync = promisify(gunzip);
 const execFileAsync = promisify(execFile);
@@ -192,7 +192,7 @@ app.get<{ Querystring: { url: string } }>('/epg', async (request, reply) => {
     }
 });
 
-app.get<{ Querystring: { url: string } }>('/proxy', async (request, reply) => {
+app.get<{ Querystring: { url: string } }>('/proxy', (request, reply) => {
   const { url } = request.query;
   if (!url) {
     reply.code(400).send({ error: 'url query parameter is required' });
@@ -200,30 +200,58 @@ app.get<{ Querystring: { url: string } }>('/proxy', async (request, reply) => {
   }
 
   try {
-    // Forward important headers from the client to the target server
-    const headers: Record<string, string> = {
-      'User-Agent': request.headers['user-agent'] || userAgent, // Fallback to default UA
-    };
+    // Dynamically build curl arguments, forwarding the original client's headers
+    const args = [
+      '-L', // Follow redirects
+      '-k', // Insecure (ignore SSL errors)
+      '--compressed', // Handle compressed content
+      '-A', request.headers['user-agent'] || userAgent, // Forward User-Agent
+    ];
+
+    // Forward Referer if it exists, as some servers require it
     if (request.headers['referer']) {
-      headers['Referer'] = request.headers['referer'];
+      args.push('-e', request.headers['referer']);
     }
 
-    const response = await axios({
-      method: 'get',
-      url: url,
-      responseType: 'arraybuffer',
-      headers: headers,
-      proxy: false,
+    // The URL must be the last argument for curl
+    args.push(url);
+
+    const curl = spawn('curl', args);
+
+    // Set Content-Type based on extension as a reliable fallback.
+    if (url.includes('.m3u8')) {
+      reply.header('Content-Type', 'application/vnd.apple.mpegurl');
+    } else if (url.includes('.ts')) {
+      reply.header('Content-Type', 'video/mp2t');
+    } else {
+      reply.header('Content-Type', 'application/octet-stream');
+    }
+
+    // Stream the response directly to the client
+    curl.stdout.pipe(reply.raw);
+
+    curl.stderr.on('data', (data) => {
+      app.log.warn(`curl stderr for ${url}: ${data.toString()}`);
     });
 
-    reply.header('Content-Type', response.headers['content-type']);
-    reply.send(response.data);
+    curl.on('error', (err) => {
+      app.log.error(err, `Failed to spawn curl for ${url}`);
+      if (!reply.sent) {
+        reply.code(500).send({ error: 'Failed to start proxy process' });
+      }
+    });
+
+    // If the client closes the connection, kill the curl process
+    request.raw.on('close', () => {
+      if (!curl.killed) {
+        curl.kill();
+      }
+    });
+
   } catch (error) {
-    app.log.error(error);
-    if (error instanceof Error) {
-        reply.code(502).send({ error: 'Failed to proxy stream', details: error.message });
-    } else {
-        reply.code(500).send({ error: 'Failed to proxy stream', details: 'An unknown error occurred' });
+    app.log.error(error, `Error in /proxy for ${url}`);
+    if (!reply.sent) {
+      reply.code(500).send({ error: 'Unknown error in proxy' });
     }
   }
 });
