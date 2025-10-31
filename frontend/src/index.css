@@ -582,63 +582,51 @@ body {
   margin: 0;
 }
 
-.playlist-manage-list li {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas:
-    "name actions"
-    "url actions";
-  align-items: center;
-  padding: 1rem;
-  border-radius: 6px;
-  background-color: var(--surface);
-  margin-bottom: 1rem;
-}
+  .playlist-manage-list li {
+    display: flex; /* Use flexbox for simpler stacking */
+    flex-direction: column;
+    gap: 0.75rem; /* Add space between rows */
+    padding: 1rem;
+    border-radius: 6px;
+    background-color: var(--surface);
+    margin-bottom: 1rem;
+  }
 
-.playlist-name {
-  grid-area: name;
-  font-weight: bold;
-}
+  .playlist-details {
+      display: flex;
+      flex-direction: column;
+  }
 
-.playlist-url {
-  grid-area: url;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  .playlist-actions {
+      align-self: flex-end; /* This aligns the container itself to the right */
+      display: flex; /* This was missing, needed for gap and row layout */
+      gap: 1rem; /* Increased gap for better separation */
+  }
 
-.playlist-actions {
-  grid-area: actions;
-  display: flex;
-  gap: 0.5rem;
-}
+  .playlist-actions button {
+      border: none; /* Remove border for consistency with Add button */
+      padding: 0.5rem 1rem; /* Make buttons smaller */
+      border-radius: 4px;
+      cursor: pointer; /* Ensure cursor changes on hover */
+  }
 
-.playlist-actions button {
-  background-color: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
+  .playlist-actions button:not(.delete-button) {
+      background-color: var(--primary);
+      color: white;
+  }
 
-.playlist-actions button:hover {
-  background-color: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
+  .playlist-actions button:not(.delete-button):hover {
+      background-color: var(--primary-hover);
+  }
 
-.playlist-actions button.delete-button {
-    color: var(--danger);
-    border-color: var(--danger);
-}
+  .playlist-actions button.delete-button {
+      background-color: var(--danger);
+      color: white;
+  }
 
-.playlist-actions button.delete-button:hover {
-    background-color: var(--danger);
-    color: white;
-}
+  .playlist-actions button.delete-button:hover {
+      background-color: #c62828; /* A slightly darker red for hover */
+  }
 
 .playlist-actions button:disabled {
   opacity: 0.5;

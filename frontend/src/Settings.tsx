@@ -103,8 +103,10 @@ export function Settings({
                         <ul className="playlist-manage-list">
                             {playlists.map((p) => (
                             <li key={p.id}>
-                                <span className="playlist-name">{p.name}{p.isDefault && ' (默认)'}</span>
-                                <span className="playlist-url">{p.url}</span>
+                                <div className="playlist-details">
+                                    <span className="playlist-name">{p.name}{p.isDefault && ' (默认)'}</span>
+                                    <span className="playlist-url">{p.url}</span>
+                                </div>
                                 <div className="playlist-actions">
                                 <button onClick={() => handleLoadAndClose(p)}>加载</button>
                                 <button onClick={() => setDefaultPlaylist(p.id)} disabled={p.isDefault}>设为默认</button>
@@ -138,8 +140,10 @@ export function Settings({
                         <ul className="playlist-manage-list">
                             {epgSources.map((epg) => (
                             <li key={epg.id}>
-                                <span className="playlist-name">{epg.name}{epg.isDefault && ' (默认)'}</span>
-                                <span className="playlist-url">{epg.url}</span>
+                                <div className="playlist-details">
+                                    <span className="playlist-name">{epg.name}{epg.isDefault && ' (默认)'}</span>
+                                    <span className="playlist-url">{epg.url}</span>
+                                </div>
                                 <div className="playlist-actions">
                                 <button onClick={() => setDefaultEpgSource(epg.id)} disabled={epg.isDefault}>设为默认</button>
                                 <button onClick={() => deleteEpgSource(epg.id)} className="delete-button">删除</button>
